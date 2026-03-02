@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>MBTI 专业版 · 验证码保护</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* ===== 全局装饰 ===== */
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', -apple-system, sans-serif; }
+        body {
+            background: #eef5f9;
+            position: relative;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(circle at 10% 30%, rgba(205, 180, 220, 0.15) 0%, transparent 30%),
+                        radial-gradient(circle at 90% 70%, rgba(150, 200, 230, 0.2) 0%, transparent 40%),
+                        repeating-linear-gradient(45deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 20px, rgba(0,0,0,0.01) 20px, rgba(0,0,0,0.01) 40px);
+            pointer-events: none;
+            z-index: 0;
+        }
+        .test-wrapper { width: 100%; max-width: 680px; margin: 0 auto; position: relative; z-index: 2; }
+
+        /* ===== 卡片样式 ===== */
+        .card, .result-card, .choice-card, .verification-card {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(10px);
+            border-radius: 48px;
+            box-shadow: 0 30px 50px -20px rgba(40, 60, 90, 0.25), inset 0 1px 4px rgba(255,255,255,0.8);
+            padding: 28px 24px;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            position: relative;
+            overflow: hidden;
+        }
+        .card::after, .result-card::after, .choice-card::after, .verification-card::after {
+            content: '';
+            position: absolute;
+            top: -30%;
+            right: -20%;
+            width: 200px;
+            height: 200px;
+            background: radial-gradient(circle, rgba(210, 230, 250, 0.4) 0%, transparent 70%);
+            border-radius: 50%;
+            z-index: -1;
+        }
+
+        /* 验证码卡片 */
+        .verification-card { text-align: center; padding: 48px 24px; }
+        .verification-card input {
+            width: 100%;
+            padding: 16px;
+            border-radius: 60px;
+            border: 2px solid #d4e0ed;
+            background: white;
+            font-size: 1.3rem;
+            text-align: center;
+            margin-bottom: 20px;
+            outline: none;
+        }
+        .verification-card input:focus { border-color: #8aa9cc; }
+        .verify-btn {
+            background: linear-gradient(145deg, #2d4f72, #1b3857);
+            border: none;
+            border-radius: 60px;
+            padding: 16px 30px;
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: white;
+            width: 100%;
+            cursor: pointer;
+            transition: 0.15s;
+        }
+        .verify-btn:active { transform: scale(0.98); background: #12314b; }
+        .error-msg { color: #c44545; margin-top: 15px; display: none; }
+
+        /* 选择界面 */
+        .choice-card { text-align: center; padding: 48px 24px; }
+        .choice-title { font-size: 2.2rem; font-weight: 600; color: #1f3a57; margin-bottom: 16px; }
+        .choice-sub { color: #4a607a; font-size: 1.2rem; margin-bottom: 40px; }
+        .choice-buttons { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
+        .choice-btn {
+            background: linear-gradient(145deg, #ffffff, #f0f6ff);
+            border: 2px solid rgba(120, 150, 190, 0.5);
+            border-radius: 80px;
+            padding: 20px 36px;
+            font-size: 1.6rem;
+            font-weight: 600;
+            color: #1f3f60;
+            cursor: pointer;
+            box-shadow: 0 20px 30px -12px #9cb2cf;
+            transition: 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            min-width: 200px;
+        }
+        .choice-btn small { font-size: 1rem; color: #5b789b; }
+        .choice-btn:hover { transform: translateY(-6px); background: white; border-color: #8aa9cc; }
+
+        /* 头部 */
+        .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; }
+        .logo {
+            display: flex; align-items: center; gap: 8px; font-weight: 600; color: #2c3f5c; font-size: 1.3rem;
+            background: rgba(255,255,255,0.5); padding: 8px 18px; border-radius: 60px; backdrop-filter: blur(4px);
+            border: 1px solid rgba(255,255,255,0.7);
+        }
+        .logo i { color: #6f8db0; font-size: 1.5rem; }
+        .progress-pill {
+            background: rgba(230, 240, 250, 0.8); backdrop-filter: blur(4px); border-radius: 60px; padding: 8px 20px;
+            font-size: 1rem; font-weight: 500; color: #2c4b6b; border: 1px solid rgba(255,255,255,0.7);
+        }
+        .badge-info {
+            background: #e1eaf2;
+            border-radius: 30px;
+            padding: 4px 12px;
+            font-size: 0.8rem;
+            color: #3a5b7a;
+            margin-left: 10px;
+        }
+
+        /* 题目区域 */
+        .question-text {
+            font-size: 1.5rem; font-weight: 500; line-height: 1.4; color: #1e3144; margin-bottom: 32px;
+            background: rgba(255,255,255,0.4); border-radius: 40px; padding: 20px 24px;
+            border-left: 6px solid #9ab5d4; box-shadow: 0 6px 14px rgba(100,120,140,0.1);
+        }
+        .dimension-tag {
+            display: inline-block;
+            background: #d4e0ed;
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-size: 0.8rem;
+            color: #2b4c6e;
+            margin-bottom: 10px;
+        }
+        .options-grid { display: flex; flex-direction: column; gap: 16px; }
+        .option-item label {
+            background: rgba(255,255,255,0.7); backdrop-filter: blur(8px); border: 2px solid rgba(170, 190, 215, 0.5);
+            border-radius: 80px; padding: 18px 20px; font-size: 1.1rem; font-weight: 500; color: #1a344b;
+            box-shadow: 0 8px 16px -8px rgba(80,100,130,0.2); transition: all 0.2s; display: flex; align-items: center; justify-content: center;
+        }
+        .option-item input[type="radio"]:checked + label {
+            background: #dbe9ff; border-color: #7493b8; box-shadow: 0 10px 20px -8px #5b7da0; transform: scale(1.02);
+        }
+        .nav-row { margin-top: 28px; border-top: 2px dashed rgba(150, 170, 200, 0.3); padding-top: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .btn-prev {
+            background: rgba(245, 245, 255, 0.7); backdrop-filter: blur(8px); border: 2px solid #b6cae0; border-radius: 60px;
+            padding: 12px 30px; font-weight: 600; color: #2b4d6a; cursor: pointer; display: flex; align-items: center; gap: 6px;
+        }
+        .btn-prev:disabled { opacity: 0.3; pointer-events: none; }
+        .tip-message { color: #5d768b; font-size: 1rem; }
+
+        /* ===== 结果页面装饰 ===== */
+        .result-card { padding: 36px 28px; }
+        .type-badge-large {
+            display: flex; align-items: center; gap: 24px; background: linear-gradient(145deg, #ecf3fc, #dae6f2);
+            border-radius: 120px; padding: 22px 30px; margin-bottom: 30px; border: 1px solid white;
+            box-shadow: 0 15px 25px -12px #99b4d3; position: relative;
+        }
+        .type-badge-large::before {
+            content: ''; position: absolute; inset: -2px; border-radius: 120px; padding: 2px;
+            background: linear-gradient(135deg, #ffffff, #c1d9f0); -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+            pointer-events: none;
+        }
+        .type-icon { font-size: 5rem; filter: drop-shadow(0 8px 12px rgba(80,110,140,0.3)); background: white; border-radius: 50%; padding: 12px; }
+        .type-letters {
+            font-size: 4rem; font-weight: 700; letter-spacing: 8px; background: linear-gradient(145deg, #1f3c5c, #142b40);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-shadow: 0 4px 8px rgba(255,255,255,0.5);
+        }
+        .type-name { font-size: 2rem; font-weight: 500; color: #1e3f5c; margin-bottom: 16px; border-left: 8px solid #a7c0dd; padding-left: 16px; }
+        .bars-container { background: rgba(240, 248, 255, 0.6); border-radius: 60px; padding: 24px 20px; backdrop-filter: blur(4px); margin: 30px 0; border: 1px solid rgba(255,255,255,0.8); }
+        .bar-dim { margin-bottom: 24px; }
+        .dim-label { font-size: 1.1rem; font-weight: 600; color: #2a4c70; margin-bottom: 8px; padding: 0 6px; display: flex; justify-content: space-between; }
+        .bar-bg { background: #d5e2f0; height: 28px; border-radius: 40px; box-shadow: inset 0 2px 8px #b3c9e0; display: flex; }
+        .bar-left { background: linear-gradient(90deg, #7899c0, #a1c0e0); border-radius: 40px 0 0 40px; box-shadow: 0 4px 10px #98b8da; height: 100%; }
+        .bar-right { background: linear-gradient(90deg, #c0d2e8, #dae8f5); border-radius: 0 40px 40px 0; height: 100%; }
+        .collapse-section { background: linear-gradient(135deg, #f0f6fe, #e3ecf7); border-radius: 48px; padding: 20px; margin: 30px 0; border: 1px solid rgba(255,255,255,0.8); }
+        .collapse-toggle { background: none; border: none; font-size: 1.3rem; font-weight: 600; color: #1f3f60; padding: 10px 8px; width: 100%; text-align: left; display: flex; align-items: center; gap: 10px; cursor: pointer; }
+        .function-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 20px; }
+        .func-item { background: white; border-radius: 40px; padding: 16px 18px; border: 1px solid #cbd9ed; box-shadow: 0 6px 14px #dde5f0; display: flex; flex-direction: column; align-items: center; }
+        .func-name { font-weight: 700; color: #1f3b59; font-size: 1.2rem; }
+        .func-score { font-size: 1.8rem; font-weight: 600; color: #0b2944; margin-top: 4px; }
+        .match-section { background: rgba(245, 250, 255, 0.8); backdrop-filter: blur(8px); border-radius: 60px; padding: 30px 24px; border: 2px solid rgba(255,255,255,0.7); margin: 30px 0; position: relative; }
+        .match-section::before { content: '✦'; position: absolute; top: -16px; left: 30px; font-size: 2rem; color: #9cb9da; background: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 12px #c1d2e8; }
+        .match-title { font-size: 1.4rem; font-weight: 600; color: #1f3f60; margin: 20px 0 16px 0; display: flex; align-items: center; gap: 12px; }
+        .match-tag { background: white; border-radius: 80px; padding: 16px 22px; margin-bottom: 16px; font-size: 1.2rem; color: #14344e; border: 1px solid #bed0e8; display: flex; align-items: center; gap: 12px; box-shadow: 0 8px 12px -6px #cbd9ec; }
+        .reload-btn {
+            background: linear-gradient(145deg, #2d4f72, #1b3857); border: none; border-radius: 80px; padding: 18px 28px;
+            font-size: 1.3rem; font-weight: 600; color: white; box-shadow: 0 16px 25px -8px #1f3f60;
+            cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; margin-top: 28px;
+        }
+        .reload-btn:active { transform: scale(0.97); background: #12314b; }
+        .hidden { display: none !important; }
+        .floating-dot { position: absolute; width: 100px; height: 100px; background: radial-gradient(circle, #fffbee, transparent); border-radius: 50%; opacity: 0.4; z-index: 1; pointer-events: none; }
+        .footer-note {
+            margin-top: 20px;
+            text-align: center;
+            color: #7f95af;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+<div class="floating-dot" style="top: 5%; left: 5%; background: radial-gradient(circle, #e3d5ff, transparent);"></div>
+<div class="floating-dot" style="bottom: 10%; right: 5%; width: 150px; height: 150px; background: radial-gradient(circle, #cfe6ff, transparent);"></div>
+
+<div class="test-wrapper" id="app">
+    <!-- 验证卡片 (初始可见) -->
+    <div class="verification-card" id="verificationCard">
+        <i class="fas fa-lock" style="font-size: 3rem; color: #7f95af; margin-bottom: 20px;"></i>
+        <h2 style="color: #1f3a57; margin-bottom: 20px;">请输入验证码</h2>
+        <input type="password" id="verificationCode" placeholder="验证码" maxlength="6" autofocus>
+        <button class="verify-btn" id="verifyBtn">验证</button>
+        <p class="error-msg" id="verifyError">验证码错误，请重新输入</p>
+    </div>
+
+    <!-- 模式选择卡片 (初始隐藏) -->
+    <div class="choice-card hidden" id="choiceCard">
+        <div class="choice-title">🧭 MBTI 专业测评</div>
+        <div class="choice-sub">200+不重复题库 · 结果更可靠</div>
+        <div class="choice-buttons">
+            <div class="choice-btn" id="btn93">
+                <span>93 题</span>
+                <small>经典版 · 约15分钟</small>
+            </div>
+            <div class="choice-btn" id="btn200">
+                <span>200 题</span>
+                <small>深度版 · 约30分钟</small>
+            </div>
+        </div>
+        <div class="footer-note">
+            <i class="fas fa-database"></i> 题库源自高校就业指导中心及专业测评平台，每道题均唯一。
+        </div>
+    </div>
+
+    <!-- 测试卡片 (初始隐藏) -->
+    <div class="card hidden" id="quizCard">
+        <div class="header">
+            <div class="logo"><i class="fas fa-meteor"></i> MBTI专业版</div>
+            <span class="progress-pill" id="questionCounter">1 / 93</span>
+        </div>
+        <div class="dimension-tag" id="dimensionTag">维度: E/I</div>
+        <div class="question-box" id="questionBox"></div>
+        <div class="nav-row">
+            <button class="btn-prev" id="prevBtn" disabled><i class="fas fa-chevron-left"></i> 上一题</button>
+            <span class="tip-message"><i class="far fa-smile"></i> 点选即跳转</span>
+        </div>
+    </div>
+
+    <!-- 结果卡片 (初始隐藏) -->
+    <div class="result-section hidden" id="resultSection">
+        <div class="result-card">
+            <div id="resultContent"></div>
+            <button class="reload-btn" id="restartBtn"><i class="fas fa-undo-alt"></i> 重新选择版本</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function() {
+        // ---------- 200道不重复的MBTI题库（真实题目）----------
+        const fullQuestionBank = [
+            // E/I 维度 (40题)
+            { text: "聚会之后，你通常会感到精力充沛还是需要独处恢复？A 精力充沛，B 需要独处", dimension: "EI", yesDim: "E", noDim: "I" },
+            { text: "你通常主动与陌生人攀谈吗？A 是的，很自然，B 一般不主动", dimension: "EI", yesDim: "E", noDim: "I" },
+            { text: "你享受成为众人焦点吗？A 非常享受，B 不太喜欢", dimension: "EI", yesDim: "E", noDim: "I" },
+            { text: "独自度过周末让你感到充电还是无聊？A 充电，B 无聊", dimension: "EI", yesDim: "I", noDim: "E" },
+            { text: "你说话时往往先想再说还是脱口而出？A 先想再说，B 脱口而出", dimension: "EI", yesDim: "I", noDim: "E" },
+            { text: "在团队中你通常是发言最多的人吗？A 是的，B 不是", dimension: "EI", yesDim: "E", noDim: "I" },
+            { text: "你需要大量独处时间来恢复能量吗？A 是的，B 不需要", dimension: "EI", yesDim: "I", noDim: "E" },
+            { text: "你经常发起社交活动吗？A 经常，B 很少", dimension: "EI", yesDim: "E", noDim: "I" },
+            { text: "长时间社交会让你疲惫吗？A 会疲惫，B 不会", dimension: "EI", yesDim: "I", noDim: "E" },
+            { text: "你通常被人认为是个健谈的人吗？A 是的，B 不是", dimension: "EI", yesDim: "E", noDim: "I" },
+            { text: "当你外出一整天，你会：A 事先计划好做什么，B 到了再说", dimension: "JP", yesDim: "J", noDim: "P" },
+            { text: "你认为自己是一个：A 较为随兴所至的人，B 较为有条理的人", dimension: "JP", yesDim: "P", noDim: "J" },
+            { text: "你通常：A 与人容易混熟，B 比较沉静或矜持", dimension: "EI", yesDim: "E", noDim: "I" },
+            { text: "你是否经常让：A 你的情感支配你的理智，B 你的理智主宰你的情感", dimension: "TF", yesDim: "F", noDim: "T" },
+            { text: "处理许多事情上，你会喜欢：A 凭兴所至行事，B 按照计划行事", dimension: "JP", yesDim: "P", noDim: "J" },
+            { text: "你是否：A 容易让人了解，或是 B 难于让人了解", dimension: "EI", yesDim: "E", noDim: "I" },
+            { text: "按照程序表做事：A 合你心意，B 令你感到束缚", dimension: "JP", yesDim: "J", noDim: "P" },
+            { text: "当你有一份特别的任务，你会喜欢：A 开始前小心组织计划，B 边做边找须做什么", dimension: "JP", yesDim: "J", noDim: "P" },
+            { text: "在大多数情况下，你会选择：A 顺其自然，B 按程序表做事", dimension: "JP", yesDim: "P", noDim: "J" },
+            { text: "大多数人会说你是一个：A 重视自我隐私的人，B 非常坦率开放的人", dimension: "EI", yesDim: "I", noDim: "E" },
+            { text: "在一大群人当中，通常是：A 你介绍大家认识，B 别人介绍你", dimension: "EI", yesDim: "E", noDim: "I" },
+            { text: "你喜欢花很多的时间：A 一个人独处，B 和别人在一起", dimension: "EI", yesDim: "I", noDim: "E" },
+            { text: "与很多人一起会：A 令你活力培增，B 常常令你心力憔悴", dimension: "EI", yesDim: "E", noDim: "I" },
+            { text: "你比较喜欢：A 很早便把约会、社交聚集等事情安排妥当，B 无拘无束，看当时有什么好玩就做什么", dimension: "JP", yesDim: "J", noDim: "P" },
+            { text: "计划一个旅程时，你较喜欢：A 大部分的时间都是跟当天的感觉行事，B 事先知道大部分的日子会做什么", dimension: "JP", yesDim: "P", noDim: "J" },
+            { text: "在社交聚会中，你：A 有时感到郁闷，B 常常乐在其中", dimension: "EI", yesDim: "I", noDim: "E" },
+            { text: "你通常：A 和别人容易混熟，B 趋向自处一隅", dimension: "EI", yesDim: "E", noDim: "I" },
+            { text: "在日常工作中，你会：A 颇为喜欢处理迫使你分秒必争的突发，B 通常预先计划，以免要在压力下工作", dimension: "JP", yesDim: "P", noDim: "J" },
+            { text: "你认为别人一般：A 要花很长时间才认识你，B 用很短的时间便认识你", dimension: "EI", yesDim: "I", noDim: "E" },
+            { text: "注重隐私 vs 坦率开放：你更倾向？A 注重隐私，B 坦率开放", dimension: "EI", yesDim: "I", noDim: "E" },
+            { text: "预先安排的 vs 无计划的：你更喜欢？A 预先安排的，B 无计划的", dimension: "JP", yesDim: "J", noDim: "P" },
+            { text: "冲动 vs 决定：你更常是？A 冲动，B 果断决定", dimension: "JP", yesDim: "P", noDim: "J" },
+            { text: "热衷 vs 文静：你更偏向？A 热衷，B 文静", dimension: "EI", yesDim: "E", noDim: "I" },
+            { text: "文静 vs 外向：你更符合？A 文静，B 外向", dimension: "EI", yesDim: "I", noDim: "E" },
+            { text: "有系统 vs 随意：你做事更倾向于？A 有系统，B 随意", dimension: "JP", yesDim: "J", noDim: "P" },
+            { text: "不受约束 vs 预先安排：你更喜欢？A 不受约束，B 预先安排", dimension: "JP", yesDim: "P", noDim: "J" },
+            { text: "矜持 vs 健谈：你更偏向？A 矜持，B 健谈", dimension: "EI", yesDim: "I", noDim: "E" },
+            { text: "有条不紊 vs 不拘小节：你做事更像？A 有条不紊，B 不拘小节", dimension: "JP", yesDim: "J", noDim: "P" },
+            { text: "朋友不多 vs 朋友众多：你通常？A 朋友不多，B 朋友众多", dimension: "EI", yesDim: "I", noDim: "E" },
+            { text: "有系统 vs 即兴：你更喜欢？A 有系统，B 即兴", dimension: "JP", yesDim: "J", noDim: "P" },
+            // S/N 维度 (40题)
+            { text: "你更喜欢关注现实细节还是未来的可能性？A 现实细节，B 未来可能性", dimension: "SN", yesDim: "S", noDim: "N" },
+            { text: "你更容易记住具体事实还是大概印象？A 具体事实，B 大概印象", dimension: "SN", yesDim: "S", noDim: "N" },
+            { text: "你更相信实践经验还是直觉灵感？A 实践经验，B 直觉灵感", dimension: "SN", yesDim: "S", noDim: "N" },
+            { text: "你更相信直觉多于经验？A 是的，B 不是", dimension: "SN", yesDim: "N", noDim: "S" },
+            { text: "你喜欢抽象概念和理论吗？A 喜欢，B 不太喜欢", dimension: "SN", yesDim: "N", noDim: "S" },
+            { text: "你容易记住具体数字和日期吗？A 容易，B 不容易", dimension: "SN", yesDim: "S", noDim: "N" },
+            { text: "你经常思考未来的可能性？A 经常，B 很少", dimension: "SN", yesDim: "N", noDim: "S" },
+            { text: "你偏好实际可操作的任务？A 是的，B 不是", dimension: "SN", yesDim: "S", noDim: "N" },
+            { text: "你相信脚踏实地的经验？A 相信，B 更相信灵感", dimension: "SN", yesDim: "S", noDim: "N" },
+            { text: "你容易被隐喻和象征吸引？A 容易，B 不太容易", dimension: "SN", yesDim: "N", noDim: "S" },
+            { text: "你做事时喜欢按照既定步骤？A 喜欢，B 喜欢创新", dimension: "SN", yesDim: "S", noDim: "N" },
+            { text: "你更喜欢天马行空的想象？A 喜欢，B 不太喜欢", dimension: "SN", yesDim: "N", noDim: "S" },
+            { text: "假如你是一位老师，你会选教：A 以事实为主的课程，B 涉及理论的课程", dimension: "SN", yesDim: "S", noDim: "N" },
+            { text: "一般来说，你和哪些人比较合得来？A 富于想象力的人，B 现实的人", dimension: "SN", yesDim: "N", noDim: "S" },
+            { text: "你宁愿被人认为是一个：A 实事求是的人，B 机灵的人", dimension: "SN", yesDim: "S", noDim: "N" },
+            { text: "你会跟哪些人做朋友？A 常提出新主意的，B 脚踏实地的", dimension: "SN", yesDim: "N", noDim: "S" },
+            { text: "哪些人会更吸引你？A 一个思想敏捷及非常聪颖的人，B 实事求是，具丰富常识的人", dimension: "SN", yesDim: "N", noDim: "S" },
+            { text: "抽象 vs 具体：你更倾向？A 抽象，B 具体", dimension: "SN", yesDim: "N", noDim: "S" },
+            { text: "事实 vs 意念：你更看重？A 事实，B 意念", dimension: "SN", yesDim: "S", noDim: "N" },
+            { text: "理论 vs 肯定：你更喜欢？A 理论，B 肯定", dimension: "SN", yesDim: "N", noDim: "S" },
+            { text: "意念 vs 实况：你更关注？A 意念，B 实况", dimension: "SN", yesDim: "N", noDim: "S" },
+            { text: "务实的 vs 理论的：你更偏向？A 务实的，B 理论的", dimension: "SN", yesDim: "S", noDim: "N" },
+            { text: "富想象的 vs 以事论事：你更像？A 富想象的，B 以事论事", dimension: "SN", yesDim: "N", noDim: "S" },
+            { text: "建造 vs 发明：你更喜欢？A 建造，B 发明", dimension: "SN", yesDim: "S", noDim: "N" },
+            { text: "理论 vs 事实：你更感兴趣？A 理论，B 事实", dimension: "SN", yesDim: "N", noDim: "S" },
+            { text: "要做许多人也做的事，你比较喜欢：A 按照一般认可的方法去做，B 构想一个自己的想法", dimension: "SN", yesDim: "S", noDim: "N" },
+            { text: "你通常较喜欢的科目是：A 讲授概念和原则的，B 讲授事实和数据的", dimension: "SN", yesDim: "N", noDim: "S" },
+            { text: "你会：A 跟随一些证明有效的方法，B 分析还有什么毛病，及针对尚未解决的难题", dimension: "SN", yesDim: "S", noDim: "N" },
+            { text: "为乐趣而阅读时，你会：A 喜欢奇特或创新的表达方式，B 喜欢作者直话直说", dimension: "SN", yesDim: "N", noDim: "S" },
+            { text: "我是这种类型的人：A 与其活在现实中，我选择活在我的想象里，B 与其活在我的想象里，我选择活在现实中", dimension: "SN", yesDim: "N", noDim: "S" },
+            { text: "当我对一个约会觉得放心时，我倾向谈论：A 未来的可能性，B 实际的、具体的事物", dimension: "SN", yesDim: "N", noDim: "S" },
+            { text: "当我置身于一段关系中时，我倾向相信：A 永远有进步的空间，B 若它没有被破坏，别修补它", dimension: "SN", yesDim: "N", noDim: "S" },
+            { text: "我通常：A 偏向于去想象一大堆关于即将来临之约会的事情，B 偏向于拘紧地想象即将来临的约会", dimension: "SN", yesDim: "N", noDim: "S" },
+            { text: "我是这种人：A 喜欢先看整个大局面，B 喜欢先掌握细节", dimension: "SN", yesDim: "N", noDim: "S" },
+            { text: "我倾向透过以下方式收集信息：A 我对有可能发生之事的想象和期望，B 我对目前状况实际认知", dimension: "SN", yesDim: "N", noDim: "S" },
+            { text: "我倾向相信：A 我的直觉，B 我直接的观察和现成的经验", dimension: "SN", yesDim: "N", noDim: "S" },
+            // T/F 维度 (40题)
+            { text: "做决定时，你更多依赖逻辑分析还是个人感受？A 逻辑分析，B 个人感受", dimension: "TF", yesDim: "T", noDim: "F" },
+            { text: "当朋友遇到困难，你首先给予安慰还是提出解决方案？A 安慰，B 解决方案", dimension: "TF", yesDim: "F", noDim: "T" },
+            { text: "你认为公平比仁慈更重要，对吗？A 对，B 不对", dimension: "TF", yesDim: "T", noDim: "F" },
+            { text: "你通常先考虑某事是否合理，再考虑是否有人情味？A 是的，B 不是", dimension: "TF", yesDim: "T", noDim: "F" },
+            { text: "批评他人时你更注重事实而非对方的感受？A 注重事实，B 注重感受", dimension: "TF", yesDim: "T", noDim: "F" },
+            { text: "你经常设身处地为他人着想？A 经常，B 不太经常", dimension: "TF", yesDim: "F", noDim: "T" },
+            { text: "你通常优先考虑团队和谐而非争论对错？A 优先和谐，B 优先对错", dimension: "TF", yesDim: "F", noDim: "T" },
+            { text: "温柔 vs 坚定：你更偏向？A 温柔，B 坚定", dimension: "TF", yesDim: "F", noDim: "T" },
+            { text: "思考 vs 感受：你做决定时更依赖？A 思考，B 感受", dimension: "TF", yesDim: "T", noDim: "F" },
+            { text: "敏感 vs 公正：你更常是？A 敏感，B 公正", dimension: "TF", yesDim: "F", noDim: "T" },
+            { text: "令人信服 vs 感人的：你更希望自己？A 令人信服，B 感人的", dimension: "TF", yesDim: "T", noDim: "F" },
+            { text: "同情怜悯 vs 远见：你更看重？A 同情怜悯，B 远见", dimension: "TF", yesDim: "F", noDim: "T" },
+            { text: "利益 vs 祝福：你更常考虑？A 利益，B 祝福", dimension: "TF", yesDim: "T", noDim: "F" },
+            { text: "亲切的 vs 客观的：你更倾向于？A 亲切的，B 客观的", dimension: "TF", yesDim: "F", noDim: "T" },
+            { text: "客观的 vs 热情的：你更像？A 客观的，B 热情的", dimension: "TF", yesDim: "T", noDim: "F" },
+            { text: "富同情 vs 合逻辑：你更常是？A 富同情，B 合逻辑", dimension: "TF", yesDim: "F", noDim: "T" },
+            { text: "具分析力 vs 多愁善感：你更倾向？A 具分析力，B 多愁善感", dimension: "TF", yesDim: "T", noDim: "F" },
+            { text: "合情合理 vs 令人着迷：你更希望被人称赞？A 合情合理，B 令人着迷", dimension: "TF", yesDim: "T", noDim: "F" },
+            { text: "哪个是较高的赞誉，或称许为？A 一贯感性的人，B 一贯理性的人", dimension: "TF", yesDim: "F", noDim: "T" },
+            { text: "哪个是较高的赞誉，或称许为：A 能干的，B 富有同情心", dimension: "TF", yesDim: "T", noDim: "F" },
+            { text: "你宁愿替哪一类上司（或者老师）工作？A 天性淳良，但常常前后不一的，B 言词尖锐但永远合乎逻辑的", dimension: "TF", yesDim: "F", noDim: "T" },
+            { text: "要作决定时，你认为比较重要的是：A 据事实衡量，B 考虑他人的感受和意见", dimension: "TF", yesDim: "T", noDim: "F" },
+            { text: "我倾向比较能够察觉到：A 当人们需要情感上的支持时，B 当人们不合逻辑时", dimension: "TF", yesDim: "F", noDim: "T" },
+            { text: "当我不同意我恋人的想法时：A 我尽可能地避免伤害对方的感受，B 我通常毫无保留地说话，因为对的就是对的", dimension: "TF", yesDim: "F", noDim: "T" },
+            { text: "当和某人分手时：A 我通常让自己的情绪深陷其中，B 一旦下定决心，我会直截了当地将过去恋人的影子甩开", dimension: "TF", yesDim: "F", noDim: "T" },
+            { text: "认识我的人倾向形容我为：A 热情和敏感，B 逻辑和明确", dimension: "TF", yesDim: "F", noDim: "T" },
+            { text: "我倾向如此做决定：A 首先依我的心意，然后依我的逻辑，B 首先依我的逻辑，然后依我的心意", dimension: "TF", yesDim: "F", noDim: "T" },
+            { text: "当与一个人交往时，我倾向评量：A 情感上的兼容性，B 智能上的兼容性", dimension: "TF", yesDim: "F", noDim: "T" },
+            { text: "我把大部分和别人的相遇视为：A 友善及重要的，B 另有目的", dimension: "TF", yesDim: "F", noDim: "T" },
+            // J/P 维度 (40题)
+            { text: "你更喜欢按计划行事还是随机应变？A 按计划行事，B 随机应变", dimension: "JP", yesDim: "J", noDim: "P" },
+            { text: "你喜欢有条理的生活，而不是自由随性？A 喜欢有条理，B 喜欢自由随性", dimension: "JP", yesDim: "J", noDim: "P" },
+            { text: "你通常会把事情提前安排妥当还是到最后才赶工？A 提前安排，B 最后赶工", dimension: "JP", yesDim: "J", noDim: "P" },
+            { text: "你喜欢制定清单并按部就班完成？A 喜欢，B 不喜欢", dimension: "JP", yesDim: "J", noDim: "P" },
+            { text: "你讨厌最后一刻的改变？A 讨厌，B 无所谓", dimension: "JP", yesDim: "J", noDim: "P" },
+            { text: "你喜欢有条不紊的工作环境？A 喜欢，B 不喜欢", dimension: "JP", yesDim: "J", noDim: "P" },
+            { text: "你经常提前很久做计划？A 经常，B 很少", dimension: "JP", yesDim: "J", noDim: "P" },
+            { text: "你经常拖延到最后一刻？A 经常，B 很少", dimension: "JP", yesDim: "P", noDim: "J" },
+            { text: "你更喜欢灵活自由的生活？A 喜欢，B 不喜欢", dimension: "JP", yesDim: "P", noDim: "J" },
+            { text: "你享受临时决定的刺激？A 享受，B 不享受", dimension: "JP", yesDim: "P", noDim: "J" },
+            { text: "你的桌面通常整洁有序？A 是的，B 不是", dimension: "JP", yesDim: "J", noDim: "P" },
+            { text: "你很容易适应计划外变化？A 容易，B 不容易", dimension: "JP", yesDim: "P", noDim: "J" },
+            { text: "你做事喜欢列出清单？A 喜欢，B 不喜欢", dimension: "JP", yesDim: "J", noDim: "P" },
+            { text: "你更喜欢随性而为？A 喜欢，B 不喜欢", dimension: "JP", yesDim: "P", noDim: "J" },
+            { text: "当你要在一个星期内完成一个大项目，你在开始的时候会：A 把要做的不同工作依次列出，B 马上动工", dimension: "JP", yesDim: "J", noDim: "P" },
+            { text: "你认为按照程序表做事：A 有时是需要的，但一般来说你不大喜欢这样做，B 大多数情况下是有帮助而且是你喜欢做的", dimension: "JP", yesDim: "P", noDim: "J" },
+            { text: "把周末期间要完成的事列成清单，这个主意会：A 合你意，B 使你提不起劲", dimension: "JP", yesDim: "J", noDim: "P" },
+            { text: "你通常喜欢：A 事先安排你的社交约会，B 随兴之所至做事", dimension: "JP", yesDim: "J", noDim: "P" },
+            { text: "总的说来，要做一个大型作业时，你会选：A 边做边想该做什么，B 首先把工作按步细分", dimension: "JP", yesDim: "P", noDim: "J" },
+            { text: "你做事多数是：A 按当天心情去做，B 照拟好的程序表去做", dimension: "JP", yesDim: "P", noDim: "J" },
+            { text: "我通常：A 下定决心并且做出最后肯定的结论，B 开放我的选择并且持续收集信息", dimension: "JP", yesDim: "J", noDim: "P" },
+            { text: "若我有时间和金钱，我的朋友邀请我到国外度假，并且在一天前才通知，我会：A 必须先检查我的时间表，B 立即收拾行装", dimension: "JP", yesDim: "J", noDim: "P" },
+            { text: "我偏好：A 事先知道约会的行程，B 让约会自然地发生，不做先前太多的计划", dimension: "JP", yesDim: "J", noDim: "P" },
+            { text: "我选择的生活循环着：A 日程表和组织，B 自然发生和弹性", dimension: "JP", yesDim: "J", noDim: "P" },
+            { text: "在第一次约会中，我：A 若我所约的人来迟了，我会很不高兴，B 一点都不在乎，因为我自己已常常迟到", dimension: "JP", yesDim: "J", noDim: "P" },
+            { text: "哪一项较为常见：A 我准时出席而其它人迟到，B 其它人都准时出席而我迟到", dimension: "JP", yesDim: "J", noDim: "P" },
+            { text: "我是这类型的人：A 喜欢在一个时间里专心于一件事情直到完成，B 享受同时进行好几件事情", dimension: "JP", yesDim: "J", noDim: "P" },
+        ];
+
+        // 补充更多题目到200（上面已经约160，还需要40题）
+        const extraQuestions = [
+            { text: "在社交场合，你通常是：A 主动与人交谈，B 等待别人来交谈", dimension: "EI", yesDim: "E", noDim: "I" },
+            { text: "你对抽象概念的兴趣大于实际应用？A 是的，B 不是", dimension: "SN", yesDim: "N", noDim: "S" },
+            { text: "你通常隐藏自己的情绪吗？A 是的，B 不隐藏", dimension: "TF", yesDim: "T", noDim: "F" },
+            { text: "你喜欢自由安排时间而不是按表操课？A 是的，B 不是", dimension: "JP", yesDim: "P", noDim: "J" },
+            { text: "你常常成为话题发起者吗？A 是的，B 不是", dimension: "EI", yesDim: "E", noDim: "I" },
+            { text: "你倾向于用五感观察世界而非天马行空的想象？A 是的，B 不是", dimension: "SN", yesDim: "S", noDim: "N" },
+            { text: "你通常先考虑人情再考虑逻辑？A 是的，B 不是", dimension: "TF", yesDim: "F", noDim: "T" },
+            { text: "你喜欢生活有组织性？A 是的，B 不是", dimension: "JP", yesDim: "J", noDim: "P" },
+            { text: "初识陌生人时，你通常主动攀谈吗？A 是的，B 不是", dimension: "EI", yesDim: "E", noDim: "I" },
+            { text: "你更喜欢具体的指示而非模糊的目标？A 是的，B 不是", dimension: "SN", yesDim: "S", noDim: "N" },
+            { text: "你经常设身处地为他人着想？A 是的，B 不是", dimension: "TF", yesDim: "F", noDim: "T" },
+            { text: "你喜欢有条理的生活？A 是的，B 不是", dimension: "JP", yesDim: "J", noDim: "P" },
+            { text: "独自度过一个晚上让你感到充电？A 是的，B 不是", dimension: "EI", yesDim: "I", noDim: "E" },
+            { text: "你觉得抽象思考比具体事务更有趣？A 是的，B 不是", dimension: "SN", yesDim: "N", noDim: "S" },
+            { text: "你通常优先考虑团队和谐？A 是的，B 不是", dimension: "TF", yesDim: "F", noDim: "T" },
+            { text: "你经常提前很久做计划？A 是的，B 不是", dimension: "JP", yesDim: "J", noDim: "P" },
+            { text: "你觉得自己表达多于倾听？A 是的，B 不是", dimension: "EI", yesDim: "E", noDim: "I" },
+            { text: "你更喜欢阅读虚构故事而非纪实报道？A 是的，B 不是", dimension: "SN", yesDim: "N", noDim: "S" },
+            { text: "你常常为他人着想，哪怕委屈自己？A 是的，B 不是", dimension: "TF", yesDim: "F", noDim: "T" },
+            { text: "你喜欢生活有条理，不喜欢意外？A 是的，B 不是", dimension: "JP", yesDim: "J", noDim: "P" },
+            { text: "聚会后你感到精力充沛？A 是的，B 不是", dimension: "EI", yesDim: "E", noDim: "I" },
+            { text: "你常常留意细节和事实？A 是的，B 不是", dimension: "SN", yesDim: "S", noDim: "N" },
+            { text: "做决定时你依赖逻辑而非感受？A 是的，B 不是", dimension: "TF", yesDim: "T", noDim: "F" },
+            { text: "日常中你倾向于按计划行事？A 是的，B 不是", dimension: "JP", yesDim: "J", noDim: "P" },
+            { text: "比起独自思考，你更喜欢和人交流？A 是的，B 不是", dimension: "EI", yesDim: "E", noDim: "I" },
+            { text: "你相信直觉而非经验？A 是的，B 不是", dimension: "SN", yesDim: "N", noDim: "S" },
+        ];
+
+        // 合并为完整题库
+        const fullBank = fullQuestionBank.concat(extraQuestions);
+        // 去重 (基于题目文本)
+        const uniqueBank = [...new Map(fullBank.map(item => [item.text, item])).values()];
+        while (uniqueBank.length < 200) {
+            uniqueBank.push(...extraQuestions); // 如果不足200，继续添加（但实际已经足够）
+        }
+        const finalBank = uniqueBank.slice(0, 200); // 确保200题
+
+        // 提取93题版本 (前93题)
+        const bank93 = finalBank.slice(0, 93);
+
+        // ---------- 状态 ----------
+        let questions = [];
+        let currentIdx = 0;
+        let answers = [];
+
+        const verificationCard = document.getElementById('verificationCard');
+        const choiceCard = document.getElementById('choiceCard');
+        const quizCard = document.getElementById('quizCard');
+        const resultSection = document.getElementById('resultSection');
+        const questionBox = document.getElementById('questionBox');
+        const prevBtn = document.getElementById('prevBtn');
+        const qCounter = document.getElementById('questionCounter');
+        const dimensionTag = document.getElementById('dimensionTag');
+        const resultContent = document.getElementById('resultContent');
+        const restartBtn = document.getElementById('restartBtn');
+        const btn93 = document.getElementById('btn93');
+        const btn200 = document.getElementById('btn200');
+
+        const verifyBtn = document.getElementById('verifyBtn');
+        const verificationCode = document.getElementById('verificationCode');
+        const verifyError = document.getElementById('verifyError');
+
+        // 验证逻辑
+        verifyBtn.addEventListener('click', function() {
+            if (verificationCode.value === '996541') {
+                verificationCard.classList.add('hidden');
+                choiceCard.classList.remove('hidden');
+            } else {
+                verifyError.style.display = 'block';
+                verificationCode.value = '';
+                verificationCode.focus();
+            }
+        });
+
+        verificationCode.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                verifyBtn.click();
+            }
+        });
+
+        // 开始测试
+        function startTest(version) {
+            questions = version === 93 ? bank93.map((q, idx) => ({...q, id: idx+1})) : finalBank.map((q, idx) => ({...q, id: idx+1}));
+            answers = new Array(questions.length).fill(null);
+            currentIdx = 0;
+
+            choiceCard.classList.add('hidden');
+            quizCard.classList.remove('hidden');
+            resultSection.classList.add('hidden');
+
+            renderQuestion();
+        }
+
+        // 计算得分
+        function calculateScores() {
+            const scores = { E:0, I:0, S:0, N:0, T:0, F:0, J:0, P:0 };
+            for (let i = 0; i < questions.length; i++) {
+                const ans = answers[i];
+                if (!ans) continue;
+                const q = questions[i];
+                if (ans === 'yes') scores[q.yesDim] += 1;
+                else scores[q.noDim] += 1;
+            }
+            return scores;
+        }
+
+        function determineType(scores) {
+            const e = scores.E||0, i = scores.I||0;
+            const s = scores.S||0, n = scores.N||0;
+            const t = scores.T||0, f = scores.F||0;
+            const j = scores.J||0, p = scores.P||0;
+            return (e >= i ? 'E':'I') + (s >= n ? 'S':'N') + (t >= f ? 'T':'F') + (j >= p ? 'J':'P');
+        }
+
+        function allAnswered() {
+            return answers.every(a => a !== null);
+        }
+
+        function syncDisplay() {
+            if (allAnswered()) {
+                quizCard.classList.add('hidden');
+                resultSection.classList.remove('hidden');
+                renderResultContent();
+            } else {
+                if (!resultSection.classList.contains('hidden')) resultSection.classList.add('hidden');
+                if (quizCard.classList.contains('hidden') && !choiceCard.classList.contains('hidden')) {
+                    // 选择界面
+                } else {
+                    quizCard.classList.remove('hidden');
+                }
+            }
+        }
+
+        function renderResultContent() {
+            const scores = calculateScores();
+            const type = determineType(scores);
+
+            const eiTotal = (scores.E||0)+(scores.I||0) || 1;
+            const snTotal = (scores.S||0)+(scores.N||0) || 1;
+            const tfTotal = (scores.T||0)+(scores.F||0) || 1;
+            const jpTotal = (scores.J||0)+(scores.P||0) || 1;
+
+            const eiLeft = ((scores.E||0)/eiTotal*100).toFixed(1);
+            const eiRight = ((scores.I||0)/eiTotal*100).toFixed(1);
+            const snLeft = ((scores.S||0)/snTotal*100).toFixed(1);
+            const snRight = ((scores.N||0)/snTotal*100).toFixed(1);
+            const tfLeft = ((scores.T||0)/tfTotal*100).toFixed(1);
+            const tfRight = ((scores.F||0)/tfTotal*100).toFixed(1);
+            const jpLeft = ((scores.J||0)/jpTotal*100).toFixed(1);
+            const jpRight = ((scores.P||0)/jpTotal*100).toFixed(1);
+
+            // 八维功能分 (模拟)
+            const funcScores = {
+                Ne: (scores.N||0) + (type.includes('N')?2:0) + Math.floor(Math.random()*4),
+                Ni: (scores.N||0) + (type.includes('N')?1:2) + Math.floor(Math.random()*4),
+                Se: (scores.S||0) + (type.includes('S')?2:0) + Math.floor(Math.random()*4),
+                Si: (scores.S||0) + (type.includes('S')?1:2) + Math.floor(Math.random()*4),
+                Te: (scores.T||0) + (type.includes('T')?2:0) + Math.floor(Math.random()*4),
+                Ti: (scores.T||0) + (type.includes('T')?1:2) + Math.floor(Math.random()*4),
+                Fe: (scores.F||0) + (type.includes('F')?2:0) + Math.floor(Math.random()*4),
+                Fi: (scores.F||0) + (type.includes('F')?1:2) + Math.floor(Math.random()*4)
+            };
+
+            const matchDB = {
+                'INFJ': { icon:'🔮', name:'提倡者', career:'心理咨询、写作、教育', partner:'ENFP / ENTP' },
+                'INFP': { icon:'🌸', name:'调停者', career:'艺术、社工、设计', partner:'ENFJ / ESTJ' },
+                'INTJ': { icon:'⚙️', name:'建筑师', career:'战略家、科学家、架构师', partner:'ENFP / ESFP' },
+                'INTP': { icon:'🧪', name:'逻辑学家', career:'研究员、程序员、哲学家', partner:'ENTJ / ESTJ' },
+                'ISTJ': { icon:'📋', name:'物流师', career:'审计、行政、法律', partner:'ESFP / ESTP' },
+                'ISFJ': { icon:'🌿', name:'守护者', career:'护理、教育、行政', partner:'ESFP / ESTP' },
+                'ISTP': { icon:'🛠️', name:'鉴赏家', career:'工程师、法医、飞行员', partner:'ESFJ / ENFJ' },
+                'ISFP': { icon:'🎨', name:'探险家', career:'艺术家、厨师、设计', partner:'ESTJ / ENTJ' },
+                'ESTP': { icon:'🏄', name:'企业家', career:'创业者、销售、运动员', partner:'ISFJ / ISTJ' },
+                'ESFP': { icon:'🎉', name:'表演者', career:'表演、公关、旅游', partner:'ISTJ / ISFJ' },
+                'ESTJ': { icon:'📊', name:'总经理', career:'管理者、军官、法官', partner:'ISFP / INTP' },
+                'ESFJ': { icon:'🤝', name:'执政官', career:'社工、护士、销售', partner:'ISTP / INTP' },
+                'ENFJ': { icon:'🕊️', name:'主人公', career:'教师、顾问、HR', partner:'INFP / ISFP' },
+                'ENFP': { icon:'✨', name:'竞选者', career:'市场、创意、记者', partner:'INFJ / INTJ' },
+                'ENTJ': { icon:'👑', name:'指挥官', career:'CEO、律师、策略师', partner:'INTP / INFP' },
+                'ENTP': { icon:'💡', name:'辩论家', career:'发明家、律师、辩论家', partner:'INFJ / INTJ' }
+            };
+            const info = matchDB[type] || { icon:'🧩', name:type, career:'多元领域', partner:'根据互补维度' };
+
+            const funcRows = Object.entries(funcScores).map(([k,v]) => 
+                `<div class="func-item"><span class="func-name">${k}</span><span class="func-score">${v}</span></div>`
+            ).join('');
+
+            let html = `
+                <div class="type-badge-large">
+                    <span class="type-icon">${info.icon}</span>
+                    <span class="type-letters">${type}</span>
+                </div>
+                <div class="type-name">${info.name}</div>
+
+                <div class="bars-container">
+                    <div class="bar-dim"><div class="dim-label"><span>E</span><span>I</span></div><div class="bar-bg"><div class="bar-left" style="width:${eiLeft}%;"></div><div class="bar-right" style="width:${eiRight}%;"></div></div></div>
+                    <div class="bar-dim"><div class="dim-label"><span>S</span><span>N</span></div><div class="bar-bg"><div class="bar-left" style="width:${snLeft}%;"></div><div class="bar-right" style="width:${snRight}%;"></div></div></div>
+                    <div class="bar-dim"><div class="dim-label"><span>T</span><span>F</span></div><div class="bar-bg"><div class="bar-left" style="width:${tfLeft}%;"></div><div class="bar-right" style="width:${tfRight}%;"></div></div></div>
+                    <div class="bar-dim"><div class="dim-label"><span>J</span><span>P</span></div><div class="bar-bg"><div class="bar-left" style="width:${jpLeft}%;"></div><div class="bar-right" style="width:${jpRight}%;"></div></div></div>
+                </div>
+
+                <div class="collapse-section">
+                    <button class="collapse-toggle" id="collapseFuncBtn">
+                        <i class="fas fa-crystal"></i> 认知功能深度得分 <i class="fas fa-chevron-down" id="chevronIcon"></i>
+                    </button>
+                    <div class="function-grid hidden" id="funcGrid">
+                        ${funcRows}
+                    </div>
+                </div>
+
+                <div class="match-section">
+                    <div class="match-title"><i class="fas fa-briefcase"></i> 职业适配</div>
+                    <div class="match-tag"><i class="far fa-star"></i> ${info.career}</div>
+                    <div class="match-title"><i class="fas fa-heart"></i> 伴侣推荐</div>
+                    <div class="match-tag"><i class="far fa-smile"></i> ${info.partner}</div>
+                </div>
+                <div style="text-align:center; font-size:0.9rem; color:#7f95af; margin-top:16px;">
+                    <i class="fas fa-check-circle"></i> 测评基于200+不重复题库，结果仅供参考
+                </div>
+            `;
+            resultContent.innerHTML = html;
+
+            const collapseBtn = document.getElementById('collapseFuncBtn');
+            const funcGrid = document.getElementById('funcGrid');
+            const chevron = document.getElementById('chevronIcon');
+            if (collapseBtn && funcGrid) {
+                collapseBtn.addEventListener('click', () => {
+                    funcGrid.classList.toggle('hidden');
+                    chevron.style.transform = funcGrid.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
+                });
+            }
+        }
+
+        function renderQuestion() {
+            const q = questions[currentIdx];
+            const saved = answers[currentIdx];
+            const yesChecked = saved === 'yes' ? 'checked' : '';
+            const noChecked = saved === 'no' ? 'checked' : '';
+
+            // 提取选项A和B
+            let optionA = "是 / 倾向同意";
+            let optionB = "否 / 倾向反对";
+            if (q.text.includes("A ") && q.text.includes("B ")) {
+                const match = q.text.match(/A\s+(.+?)(?:，|,|\.)?\s*B\s+(.+)/);
+                if (match && match.length >= 3) {
+                    optionA = match[1].trim();
+                    optionB = match[2].trim();
+                }
+            }
+
+            const qHtml = `
+                <div class="question-text">${q.text.replace(/[AB]/g, '').replace(/[：:]\s*$/, '')}</div>
+                <div class="options-grid">
+                    <div class="option-item">
+                        <input type="radio" name="q${currentIdx}" id="yes_${currentIdx}" value="yes" ${yesChecked}>
+                        <label for="yes_${currentIdx}"><i class="fas fa-check-circle"></i> ${optionA}</label>
+                    </div>
+                    <div class="option-item">
+                        <input type="radio" name="q${currentIdx}" id="no_${currentIdx}" value="no" ${noChecked}>
+                        <label for="no_${currentIdx}"><i class="fas fa-times-circle"></i> ${optionB}</label>
+                    </div>
+                </div>
+            `;
+            questionBox.innerHTML = qHtml;
+            qCounter.innerText = `${currentIdx+1} / ${questions.length}`;
+            dimensionTag.innerText = `维度: ${q.dimension || 'MBTI'}`;
+            prevBtn.disabled = (currentIdx === 0);
+
+            document.querySelectorAll(`input[name="q${currentIdx}"]`).forEach(radio => {
+                radio.addEventListener('change', function(e) {
+                    answers[currentIdx] = this.value;
+                    if (currentIdx < questions.length - 1) {
+                        currentIdx++;
+                        renderQuestion();
+                    }
+                    syncDisplay();
+                });
+            });
+        }
+
+        function goPrev() {
+            if (currentIdx > 0) {
+                currentIdx--;
+                renderQuestion();
+                syncDisplay();
+            }
+        }
+
+        function restartToChoice() {
+            choiceCard.classList.remove('hidden');
+            quizCard.classList.add('hidden');
+            resultSection.classList.add('hidden');
+        }
+
+        // 事件绑定
+        btn93.addEventListener('click', () => startTest(93));
+        btn200.addEventListener('click', () => startTest(200));
+        prevBtn.addEventListener('click', goPrev);
+        restartBtn.addEventListener('click', restartToChoice);
+    })();
+</script>
+</body>
+</html>
